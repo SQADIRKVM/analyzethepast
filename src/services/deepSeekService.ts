@@ -1,3 +1,4 @@
+
 import { toast } from 'sonner';
 
 interface DeepSeekOptions {
@@ -14,7 +15,7 @@ interface VideoSearchResult {
 }
 
 /**
- * Process text using the DeepSeek V3 API
+ * Process text using the DeepSeek API via our proxy server
  * @param text The text to process
  * @param prompt The system prompt for DeepSeek
  * @param options Configuration options for the API
@@ -62,8 +63,12 @@ export async function processWithDeepSeek(
 
     console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
+    // Use the proxy server URL with the correct port (3000)
+    // Make sure the port matches your proxy server configuration
+    const proxyUrl = getProxyServerUrl();
+    
     // Make request to our proxy server instead of DeepSeek API directly
-    const response = await fetch("http://localhost:3001/api/deepseek", {
+    const response = await fetch(`${proxyUrl}/api/deepseek`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -86,6 +91,8 @@ export async function processWithDeepSeek(
       // Check if it's an API key issue
       if (response.status === 401 || response.status === 403) {
         toast.error("Invalid DeepSeek API key. Please check your settings.");
+      } else {
+        toast.error(`API error: ${response.status}. Please try again or check console for details.`);
       }
       
       throw new Error(`DeepSeek API error: ${response.status} - ${JSON.stringify(errorData)}`);
@@ -115,6 +122,20 @@ export async function processWithDeepSeek(
     console.error("DeepSeek API error:", error);
     toast.error("AI text processing failed");
     throw error;
+  }
+}
+
+/**
+ * Determine the correct proxy server URL based on environment
+ */
+function getProxyServerUrl(): string {
+  // Check if we're in development or production
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Local development
+    return 'http://localhost:3000';
+  } else {
+    // Production - Use relative URL to avoid CORS in production
+    return '/api/proxy';
   }
 }
 
@@ -197,6 +218,8 @@ export async function analyzeQuestions(text: string): Promise<any> {
     - Group related concepts under consistent names
     - Use subject-appropriate terminology
     - Focus on actual concepts being tested, not question words
+    - EXCLUDE the page headers, footers, registration numbers or other administrative text from questions
+    - DO NOT include any text that starts with "Reg No" or similar
     
     Return ONLY a valid JSON array where each item follows this EXACT format:
     {
@@ -217,10 +240,12 @@ export async function analyzeQuestions(text: string): Promise<any> {
     // Remove code block markers if present
     const cleanedAnalysisText = analysisText.replace(/```json|```/g, '').trim();
     
-    let analysis;
     try {
-      analysis = JSON.parse(cleanedAnalysisText);
+      // Try to parse the JSON
+      const analysis = JSON.parse(cleanedAnalysisText);
+      
       if (!Array.isArray(analysis)) {
+        console.error("Response is not an array:", cleanedAnalysisText);
         throw new Error("Response is not an array");
       }
       
@@ -228,17 +253,31 @@ export async function analyzeQuestions(text: string): Promise<any> {
       const extractedYear = extractYearFromText(text);
       
       // Filter out any non-question entries and standardize the data
-      analysis = analysis.filter(item => {
-        return (
-          item.questionText && 
-          item.questionText.length > 20 &&
-          !item.questionText.toLowerCase().includes("reg.no") &&
-          !item.questionText.toLowerCase().includes("technology") &&
-          /\d/.test(item.questionText)
-        );
+      const filteredAnalysis = analysis.filter(item => {
+        // Check if this is a valid question entry
+        if (!item?.questionText) return false;
+        
+        // Check minimum length to exclude headers
+        if (item.questionText.length < 20) return false;
+        
+        // Exclude registration numbers or headers
+        const lowerText = item.questionText.toLowerCase();
+        if (
+          lowerText.includes("reg.no") ||
+          lowerText.includes("reg no") ||
+          lowerText.includes("registration") ||
+          lowerText.includes("duration:") ||
+          lowerText.includes("max. marks:") ||
+          lowerText.includes("page")
+        ) {
+          return false;
+        }
+        
+        // Make sure it has a number somewhere to indicate it's a question
+        return /\d/.test(item.questionText);
       }).map(item => {
         // Ensure consistent data structure
-        const standardizedItem = {
+        return {
           ...item,
           year: extractedYear || item.year || "Unknown", // Use extracted year or fallback
           subject: item.subject || "General",
@@ -246,21 +285,132 @@ export async function analyzeQuestions(text: string): Promise<any> {
           topics: standardizeTopics(item.topics || []),
           keywords: (item.keywords || []).filter(k => typeof k === 'string')
         };
-        return standardizedItem;
       });
       
       toast.success("Question analysis complete");
-      return analysis;
+      return filteredAnalysis;
     } catch (jsonError) {
       console.error("JSON parsing error:", jsonError, "Raw text:", cleanedAnalysisText);
-      toast.error("Failed to parse question analysis");
-      throw jsonError;
+      
+      // If parsing fails, fall back to a simple extraction method
+      toast.warning("Advanced analysis failed, using simple extraction");
+      
+      // Simple extraction of numbered items that look like questions
+      const simpleQuestions = extractQuestionsManually(text);
+      console.log("Extracted questions using simple method:", simpleQuestions);
+      
+      toast.success("Simple question extraction complete");
+      return simpleQuestions;
     }
   } catch (error) {
     console.error("Question analysis error:", error);
     toast.error("Question analysis failed");
-    throw error;
+    
+    // Fall back to manual extraction
+    const simpleQuestions = extractQuestionsManually(text);
+    return simpleQuestions;
   }
+}
+
+/**
+ * Extract questions manually using regex patterns when AI analysis fails
+ */
+function extractQuestionsManually(text: string): any[] {
+  // Extract questions using various patterns
+  const patterns = [
+    /(\d+\.\s.+?)(?=\d+\.|$)/gs,  // Questions with numbers and periods
+    /(?:^|\n)(\d+\s+.+?)(?=\n\d+\s|$)/gm,  // Questions with numbers at start of lines
+    /(?:Question|Q)\.?\s*(\d+.+?)(?=(?:Question|Q)\.?\s*\d+|$)/gis  // Questions labeled as "Question X"
+  ];
+  
+  const extractedYear = extractYearFromText(text);
+  const subject = determineSubject(text);
+  
+  const questions: any[] = [];
+  let questionId = 1;
+  
+  // Try each pattern
+  for (const pattern of patterns) {
+    const matches = Array.from(text.matchAll(pattern));
+    
+    if (matches.length > 0) {
+      for (const match of matches) {
+        const questionText = match[0].trim();
+        
+        // Skip very short matches
+        if (questionText.length < 20) continue;
+        
+        // Skip if it looks like a header or footer
+        if (questionText.toLowerCase().includes("reg no") ||
+            questionText.toLowerCase().includes("page") ||
+            questionText.toLowerCase().includes("downloaded")) {
+          continue;
+        }
+        
+        // Extract some simple keywords from the text
+        const keywordMatches = questionText.match(/\b[A-Z][a-z]{2,}\b/g) || [];
+        const keywords = Array.from(new Set(keywordMatches)).slice(0, 5);
+        
+        questions.push({
+          questionText,
+          subject,
+          subSubject: "General",
+          topics: [`Topic ${questionId}`],
+          keywords,
+          year: extractedYear || "Unknown"
+        });
+        
+        questionId++;
+      }
+    }
+  }
+  
+  return questions;
+}
+
+/**
+ * Try to determine the subject from text content
+ */
+function determineSubject(text: string): string {
+  const lowerText = text.toLowerCase();
+  
+  const subjectMatches = {
+    "Computer Science": ["computer", "programming", "algorithm", "data structure", "software"],
+    "Mathematics": ["math", "calculus", "algebra", "geometry", "equation"],
+    "Physics": ["physics", "mechanics", "electromagnetism", "thermodynamics"],
+    "Chemistry": ["chemistry", "molecule", "compound", "reaction"],
+    "Biology": ["biology", "cell", "organism", "gene"],
+    "Engineering": ["engineering", "circuit", "design", "system"],
+    "History": ["history", "civilization", "century", "empire"],
+    "Literature": ["literature", "poem", "novel", "author"]
+  };
+  
+  // Count matches for each subject
+  const scores: Record<string, number> = {};
+  
+  for (const [subject, keywords] of Object.entries(subjectMatches)) {
+    scores[subject] = 0;
+    for (const keyword of keywords) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      const matches = lowerText.match(regex);
+      if (matches) {
+        scores[subject] += matches.length;
+      }
+    }
+  }
+  
+  // Find the subject with the highest score
+  let bestSubject = "General";
+  let highestScore = 0;
+  
+  for (const [subject, score] of Object.entries(scores)) {
+    if (score > highestScore) {
+      highestScore = score;
+      bestSubject = subject;
+    }
+  }
+  
+  return bestSubject;
 }
 
 // Helper function to extract year from text

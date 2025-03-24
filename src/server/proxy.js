@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -5,9 +6,13 @@ const fetch = require('node-fetch');
 const app = express();
 const port = 3000;
 
-// Enable CORS for your frontend origin
+// Enable CORS for all origins in development
 app.use(cors({
-  origin: 'http://localhost:8080'
+  origin: '*', // Allow all origins in development
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 app.use(express.json());
@@ -60,7 +65,7 @@ app.post('/api/deepseek', async (req, res) => {
 
     console.log('Making request to DeepSeek API with body:', JSON.stringify(req.body, null, 2));
 
-    // Update to use the correct API endpoint
+    // Update to use the v3 API endpoint
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -71,7 +76,7 @@ app.post('/api/deepseek', async (req, res) => {
       body: JSON.stringify({
         ...req.body,
         // Ensure we're using the correct model name
-        model: 'deepseek-chat'
+        model: req.body.model || 'deepseek-chat'
       })
     });
 
