@@ -1,0 +1,107 @@
+You are an expert in React, Vite, Node.js, Express, MongoDB, OCR (Tesseract), NLP (DeepSeek V3 API), and modern UI/UX design.
+
+### Key Principles
+- Write clean, efficient, and modular React components.
+- Use functional, declarative programming; avoid class components.
+- Ensure best practices in API handling, OCR/NLP processing, and performance optimization.
+- Maintain clear, structured file organization.
+- Optimize for speed (file analysis within 10-20 seconds) and usability.
+- Prioritize security and data privacy (auto-delete uploaded files after processing).
+
+---
+
+## **Frontend (React Vite)**
+- Use **React hooks** (`useState`, `useEffect`, `useRef`) for state management.
+- Optimize file uploads using **React Dropzone** or native `<input type="file">`.
+- Implement **React Query** or **fetch API** for handling API requests.
+- Ensure **responsive design** using Tailwind CSS.
+- Use **lazy loading** for non-essential UI components.
+- Implement error boundaries for critical UI components.
+- Use `useReducer` or `Zustand` if state logic grows complex.
+- Implement **loading indicators** for API calls.
+
+**File Structure:**
+/src /components - UploadForm.tsx # Handles file upload - AnalysisResults.tsx # Displays processed results /utils - ocrUtils.ts # OCR processing helper functions - nlpUtils.ts # NLP processing helper functions /hooks - useOCR.ts # Custom hook for OCR processing - useNLP.ts # Custom hook for NLP processing /services - api.ts # API calls for backend communication
+
+
+
+---
+
+## **Backend (Node.js, Express, MongoDB)**
+- Use **Express.js** for API routing and middleware.
+- Implement **multer** for handling file uploads.
+- Utilize **Tesseract.js** for OCR processing in a worker thread.
+- Use **DeepSeek V3 API** for NLP-based question classification.
+- Implement caching via **Redis** to avoid redundant processing.
+- Secure API requests with **rate limiting and CORS policies**.
+- Log API requests and errors using **winston or pino**.
+
+**Backend API Routes:**
+POST /upload # Accepts file upload, triggers OCR processing POST /analyze # Sends extracted text to DeepSeek API GET /results/:id # Retrieves processed analysis DELETE /cleanup # Deletes processed files after completion
+
+
+- Ensure **error handling and retry mechanisms** for API failures.
+- Use **environment variables** to store API keys securely.
+
+---
+
+## **OCR & NLP Processing**
+- Extract text from images/PDFs using **Tesseract.js**.
+- Optimize OCR by **pre-processing images** (e.g., grayscale, contrast enhancement).
+- Send extracted text to **DeepSeek V3 API** for:
+  - Question classification (topic-wise, subject-wise).
+  - Keyword extraction.
+  - Frequently asked topics analysis.
+- Implement **retry logic** for API failures.
+- Store **temporary analysis results** in MongoDB.
+
+---
+
+## **Performance Optimization**
+- Process files **asynchronously** using `Promise.all()`.
+- Optimize OCR via **Web Workers** to prevent UI blocking.
+- Implement **debouncing** for frequent API requests.
+- Use **IndexedDB** for temporary caching in the frontend.
+- Ensure MongoDB queries are optimized (indexes for faster lookups).
+- Implement **lazy loading** for analysis results.
+
+---
+
+## **Security & Data Privacy**
+- **Auto-delete uploaded files** after processing (**within 5 minutes**).
+- Validate file formats before upload (**accept only .jpg, .png, .pdf**).
+- Use **helmet** middleware for security headers.
+- Implement **CSRF protection** for API routes.
+- Secure sensitive data (API keys, DB credentials) using **environment variables**.
+- Log all user actions related to file uploads and analysis.
+
+---
+
+## **User Experience & UI**
+- Provide **real-time progress feedback** for file uploads & analysis.
+- Show extracted text before sending it for NLP analysis.
+- Allow users to **download** the generated analysis report.
+- Ensure **keyboard accessibility** and WCAG compliance.
+- Implement **dark mode** for better user experience.
+
+---
+
+## **Testing & Debugging**
+- Implement **unit tests** for key functions (`Jest`, `React Testing Library`).
+- Use **Postman** for API testing.
+- Enable **debug logging** for OCR and NLP processing.
+- Use **mock API responses** for frontend development.
+- Perform **load testing** to ensure server can handle multiple requests.
+
+---
+
+## **Future Enhancements**
+- **Multi-language OCR support** (Hindi, Spanish, etc.).
+- **Trend visualization** using **D3.js or Chart.js**.
+- **User authentication** (optional) for saving past analyses.
+- **AI-powered question difficulty analysis**.
+- **PDF text extraction without OCR** (for digital PDFs).
+
+---
+
+Follow best practices in **React, Node.js, OCR, and NLP integration** while keeping performance, security, and usability a priority. 🚀
