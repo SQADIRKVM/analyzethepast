@@ -64,7 +64,6 @@ export async function processWithDeepSeek(
     console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
     // Use the proxy server URL with the correct port (3000)
-    // Make sure the port matches your proxy server configuration
     const proxyUrl = getProxyServerUrl();
     
     // Make request to our proxy server instead of DeepSeek API directly
@@ -135,7 +134,7 @@ function getProxyServerUrl(): string {
     return 'http://localhost:3000';
   } else {
     // Production - Use relative URL to avoid CORS in production
-    return '/api/proxy';
+    return '';
   }
 }
 
@@ -189,7 +188,7 @@ export async function analyzeQuestions(text: string): Promise<any> {
   const prompt = `
     You are an expert at analyzing academic question papers across all subjects. Your task is to:
     
-    1. First, identify the exam year from the question paper header/metadata
+    1. First, extract the paper title, course code, and year from the question paper header
     
     2. Identify the main subject area and sub-disciplines. Common subjects include:
        - Sciences (Physics, Chemistry, Biology, etc.)
@@ -200,28 +199,24 @@ export async function analyzeQuestions(text: string): Promise<any> {
        - Business & Economics
        - And other academic fields
     
-    3. For each question:
+    3. For each ACTUAL QUESTION (not instructions or metadata):
        - Extract the complete question text with its numbering
        - Identify the specific subject and sub-discipline
        - Extract the main concepts being tested (NOT action words)
        - Identify key technical terms and concepts
     
-    4. Group and classify topics by:
-       - Core concepts of the subject
-       - Sub-topics within the discipline
-       - Technical terms and theories
-       - Methods and applications
+    4. VERY IMPORTANT: Do NOT include any of these in your output:
+       - Registration numbers or Reg No
+       - Course codes
+       - Page numbers or headers
+       - Max marks or duration information
+       - Any text containing "Downloaded from"
+       - Any administrative text that is not a question
     
-    IMPORTANT:
-    - Extract the year from the question paper (look for year patterns like 2021, 2022-23, etc.)
-    - NEVER include action words (explain, describe, write, etc.) as topics
-    - Group related concepts under consistent names
-    - Use subject-appropriate terminology
-    - Focus on actual concepts being tested, not question words
-    - EXCLUDE the page headers, footers, registration numbers or other administrative text from questions
-    - DO NOT include any text that starts with "Reg No" or similar
+    Analyze the text carefully, paying attention to question numbering patterns (1, 2, 3 or i, ii, iii etc.) 
+    to accurately identify actual questions.
     
-    Return ONLY a valid JSON array where each item follows this EXACT format:
+    Return your results ONLY as a valid JSON array where each item follows this format:
     {
       "questionText": "The complete question text with number",
       "subject": "The main subject area",
@@ -258,7 +253,7 @@ export async function analyzeQuestions(text: string): Promise<any> {
         if (!item?.questionText) return false;
         
         // Check minimum length to exclude headers
-        if (item.questionText.length < 20) return false;
+        if (item.questionText.length < 15) return false;
         
         // Exclude registration numbers or headers
         const lowerText = item.questionText.toLowerCase();
@@ -268,19 +263,31 @@ export async function analyzeQuestions(text: string): Promise<any> {
           lowerText.includes("registration") ||
           lowerText.includes("duration:") ||
           lowerText.includes("max. marks:") ||
-          lowerText.includes("page")
+          lowerText.includes("page") ||
+          lowerText.includes("downloaded from") ||
+          lowerText.includes("course code") ||
+          lowerText.includes("technological un")
         ) {
           return false;
         }
         
         // Make sure it has a number somewhere to indicate it's a question
-        return /\d/.test(item.questionText);
+        return /\d/.test(item.questionText) || 
+               /^[a-z](\)|\.)/.test(item.questionText) || 
+               item.questionText.toLowerCase().includes("question");
       }).map(item => {
+        // Extract paper title information if found
+        let paperTitle = "";
+        const titleMatch = text.match(/course name:\s*([^\n]+)/i);
+        if (titleMatch) {
+          paperTitle = titleMatch[1].trim();
+        }
+        
         // Ensure consistent data structure
         return {
           ...item,
           year: extractedYear || item.year || "Unknown", // Use extracted year or fallback
-          subject: item.subject || "General",
+          subject: item.subject || (paperTitle || "Computer Science"),
           subSubject: item.subSubject || "General",
           topics: standardizeTopics(item.topics || []),
           keywords: (item.keywords || []).filter(k => typeof k === 'string')
@@ -316,15 +323,20 @@ export async function analyzeQuestions(text: string): Promise<any> {
  * Extract questions manually using regex patterns when AI analysis fails
  */
 function extractQuestionsManually(text: string): any[] {
+  // Extract paper title if available
+  const paperTitle = extractPaperTitle(text);
+  
   // Extract questions using various patterns
   const patterns = [
-    /(\d+\.\s.+?)(?=\d+\.|$)/gs,  // Questions with numbers and periods
-    /(?:^|\n)(\d+\s+.+?)(?=\n\d+\s|$)/gm,  // Questions with numbers at start of lines
-    /(?:Question|Q)\.?\s*(\d+.+?)(?=(?:Question|Q)\.?\s*\d+|$)/gis  // Questions labeled as "Question X"
+    /(\d+\.\s*[A-Z].+?)(?=\d+\.|$)/gs,  // Questions with numbers and periods
+    /(?:PART\s+[A-Z](?:\s+\([^)]+\))?[:\s]+)(.+?)(?=PART\s+[A-Z]|$)/gs, // Parts of the paper
+    /(?:^|\n)(\d+\s+[A-Za-z].+?)(?=\n\d+\s|$)/gm,  // Questions with numbers at start of lines
+    /(?:Question|Q)\.?\s*(\d+.+?)(?=(?:Question|Q)\.?\s*\d+|$)/gis,  // Questions labeled as "Question X"
+    /(?:^|\n)([a-e]\)\s.+?)(?=\n[a-e]\)|$)/gm  // Questions with a), b), c) format
   ];
   
   const extractedYear = extractYearFromText(text);
-  const subject = determineSubject(text);
+  const subject = paperTitle || "Computer Science";
   
   const questions: any[] = [];
   let questionId = 1;
@@ -335,27 +347,46 @@ function extractQuestionsManually(text: string): any[] {
     
     if (matches.length > 0) {
       for (const match of matches) {
-        const questionText = match[0].trim();
+        const questionText = match[0] ? match[0].trim() : match[1].trim();
         
         // Skip very short matches
-        if (questionText.length < 20) continue;
+        if (questionText.length < 15) continue;
         
         // Skip if it looks like a header or footer
         if (questionText.toLowerCase().includes("reg no") ||
             questionText.toLowerCase().includes("page") ||
-            questionText.toLowerCase().includes("downloaded")) {
+            questionText.toLowerCase().includes("downloaded") ||
+            questionText.toLowerCase().includes("duration:") ||
+            questionText.toLowerCase().includes("marks:") ||
+            questionText.toLowerCase().includes("course code")) {
           continue;
         }
+        
+        // Check if it's likely a question (contains question mark or common question starters)
+        const isLikelyQuestion = 
+          questionText.includes("?") || 
+          questionText.toLowerCase().includes("explain") ||
+          questionText.toLowerCase().includes("describe") ||
+          questionText.toLowerCase().includes("discuss") ||
+          questionText.toLowerCase().includes("write") ||
+          questionText.toLowerCase().includes("compare") ||
+          /^\d+\.\s/.test(questionText) ||  // Starts with number and period
+          /^[a-e]\)\s/.test(questionText);  // Starts with a), b), etc.
+          
+        if (!isLikelyQuestion) continue;
         
         // Extract some simple keywords from the text
         const keywordMatches = questionText.match(/\b[A-Z][a-z]{2,}\b/g) || [];
         const keywords = Array.from(new Set(keywordMatches)).slice(0, 5);
         
+        // Generate likely topics
+        const topics = extractTopicsFromQuestion(questionText);
+        
         questions.push({
           questionText,
           subject,
-          subSubject: "General",
-          topics: [`Topic ${questionId}`],
+          subSubject: determineSubSubject(questionText, subject),
+          topics,
           keywords,
           year: extractedYear || "Unknown"
         });
@@ -369,48 +400,128 @@ function extractQuestionsManually(text: string): any[] {
 }
 
 /**
- * Try to determine the subject from text content
+ * Extract paper title from the text
  */
-function determineSubject(text: string): string {
-  const lowerText = text.toLowerCase();
+function extractPaperTitle(text: string): string {
+  // Try to find course name
+  const courseMatch = text.match(/course name:\s*([^\n]+)/i);
+  if (courseMatch) {
+    return courseMatch[1].trim();
+  }
   
-  const subjectMatches = {
-    "Computer Science": ["computer", "programming", "algorithm", "data structure", "software"],
-    "Mathematics": ["math", "calculus", "algebra", "geometry", "equation"],
-    "Physics": ["physics", "mechanics", "electromagnetism", "thermodynamics"],
-    "Chemistry": ["chemistry", "molecule", "compound", "reaction"],
-    "Biology": ["biology", "cell", "organism", "gene"],
-    "Engineering": ["engineering", "circuit", "design", "system"],
-    "History": ["history", "civilization", "century", "empire"],
-    "Literature": ["literature", "poem", "novel", "author"]
+  // Try to find title-like patterns
+  const titlePatterns = [
+    /B\.Tech\s+.+?\s+Examination\s+in\s+(.+?)\s*$/m,
+    /University\s+.+?\s+Examination\s+in\s+(.+?)\s*$/m,
+    /Degree\s+.+?\s+Examination\s+in\s+(.+?)\s*$/m,
+    /(?:APJ|CUSAT|KTU)\s+.+?\s+(\w+\s+\w+(?:\s+\w+)?)\s*$/m
+  ];
+  
+  for (const pattern of titlePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  
+  // Check for known subjects in the text
+  const subjects = [
+    "System Software", "Operating Systems", "Database Management",
+    "Computer Networks", "Data Structures", "Algorithms",
+    "Digital Electronics", "Microprocessors", "Computer Architecture"
+  ];
+  
+  for (const subject of subjects) {
+    if (text.includes(subject)) {
+      return subject;
+    }
+  }
+  
+  return "Computer Science";
+}
+
+/**
+ * Extract topics from a question
+ */
+function extractTopicsFromQuestion(questionText: string): string[] {
+  // Common technical terms that could be topics
+  const technicalTerms = {
+    "Computer Science": [
+      "algorithm", "compiler", "interpreter", "assembler", "loader",
+      "data structure", "operating system", "processor", "memory", 
+      "register", "database", "network", "stack", "queue", "tree",
+      "graph", "software", "hardware", "programming", "system"
+    ],
+    "Mathematics": [
+      "calculus", "algebra", "geometry", "trigonometry", "statistics",
+      "probability", "theorem", "proof", "equation", "function",
+      "derivative", "integral", "vector", "matrix", "set"
+    ],
+    "Physics": [
+      "mechanics", "thermodynamics", "optics", "electromagnetism", "quantum",
+      "relativity", "force", "energy", "momentum", "wave", "particle"
+    ]
   };
   
-  // Count matches for each subject
-  const scores: Record<string, number> = {};
+  const topics = new Set<string>();
   
-  for (const [subject, keywords] of Object.entries(subjectMatches)) {
-    scores[subject] = 0;
-    for (const keyword of keywords) {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-      const matches = lowerText.match(regex);
-      if (matches) {
-        scores[subject] += matches.length;
+  // Check for technical terms in the question
+  for (const [subject, terms] of Object.entries(technicalTerms)) {
+    for (const term of terms) {
+      if (questionText.toLowerCase().includes(term)) {
+        // Capitalize the term for consistency
+        topics.add(term.charAt(0).toUpperCase() + term.slice(1));
+        
+        // Limit to 3 topics
+        if (topics.size >= 3) break;
+      }
+    }
+    if (topics.size >= 3) break;
+  }
+  
+  // If no technical terms were found, extract nouns as potential topics
+  if (topics.size === 0) {
+    // Simple noun extraction: capitalized words
+    const nounPattern = /\b[A-Z][a-z]{3,}\b/g;
+    const nouns = questionText.match(nounPattern) || [];
+    
+    for (const noun of nouns) {
+      if (noun !== "Explain" && noun !== "Write" && noun !== "Define" && 
+          noun !== "Discuss" && noun !== "Compare" && noun !== "List") {
+        topics.add(noun);
+        if (topics.size >= 3) break;
       }
     }
   }
   
-  // Find the subject with the highest score
-  let bestSubject = "General";
-  let highestScore = 0;
+  return Array.from(topics);
+}
+
+/**
+ * Determine a more specific sub-subject based on the question content
+ */
+function determineSubSubject(questionText: string, mainSubject: string): string {
+  const lowerText = questionText.toLowerCase();
   
-  for (const [subject, score] of Object.entries(scores)) {
-    if (score > highestScore) {
-      highestScore = score;
-      bestSubject = subject;
+  // Computer Science sub-subjects
+  if (mainSubject === "Computer Science" || mainSubject === "System Software") {
+    if (lowerText.includes("assembler") || lowerText.includes("assembly")) {
+      return "Assembly Language";
     }
+    if (lowerText.includes("compiler") || lowerText.includes("parsing")) {
+      return "Compiler Design";
+    }
+    if (lowerText.includes("loader") || lowerText.includes("linking")) {
+      return "System Programming";
+    }
+    if (lowerText.includes("macro") || lowerText.includes("processor")) {
+      return "Macro Processors";
+    }
+    return "System Software";
   }
   
-  return bestSubject;
+  // Generic fallback
+  return mainSubject;
 }
 
 // Helper function to extract year from text

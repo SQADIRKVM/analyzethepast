@@ -65,7 +65,7 @@ app.post('/api/deepseek', async (req, res) => {
 
     console.log('Making request to DeepSeek API with body:', JSON.stringify(req.body, null, 2));
 
-    // Update to use the v3 API endpoint
+    // Make sure we're using the latest v3 API endpoint
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -106,7 +106,7 @@ app.post('/api/deepseek', async (req, res) => {
     }
 
     // Check if the response has the expected structure
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
       console.error('Unexpected API response structure:', data);
       return res.status(500).json({
         error: 'Invalid API response structure',

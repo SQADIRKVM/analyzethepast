@@ -1,3 +1,4 @@
+
 import { extractQuestionsFromText, extractTextFromPDF, ExtractedText } from './pdfService';
 import { performOCR, extractTextFromPDFViaOCR } from './ocrService';
 import { databaseService } from './databaseService';
@@ -46,7 +47,7 @@ export const apiService = {
             extractedQuestions.push({
               id: `q-${Date.now()}-${index}`,
               text: item.questionText,
-              year: String(currentYear - Math.floor(Math.random() * 5)),
+              year: item.year || String(currentYear - Math.floor(Math.random() * 5)),
               subject: item.subject,
               topics: Array.isArray(item.topics) ? item.topics : [],
               keywords: Array.isArray(item.keywords) ? item.keywords : [],
@@ -132,7 +133,7 @@ export const apiService = {
             extractedQuestions.push({
               id: `q-${Date.now()}-${index}`,
               text: item.questionText,
-              year: String(currentYear - Math.floor(Math.random() * 5)),
+              year: item.year || String(currentYear - Math.floor(Math.random() * 5)),
               subject: item.subject,
               topics: Array.isArray(item.topics) ? item.topics : [],
               keywords: Array.isArray(item.keywords) ? item.keywords : [],
@@ -212,7 +213,7 @@ export const apiService = {
             extractedQuestions.push({
               id: `q-${Date.now()}-${index}`,
               text: item.questionText,
-              year: String(currentYear - Math.floor(Math.random() * 5)),
+              year: item.year || String(currentYear - Math.floor(Math.random() * 5)),
               subject: item.subject,
               topics: Array.isArray(item.topics) ? item.topics : [],
               keywords: Array.isArray(item.keywords) ? item.keywords : [],
