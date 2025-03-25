@@ -79,12 +79,16 @@ export async function processWithDeepSeek(
     console.log("Proxy server response status:", response.status);
 
     if (!response.ok) {
+      // Create a copy of the response to read it twice
+      const responseClone = response.clone();
+      
       let errorData;
       try {
-        errorData = await response.json();
+        errorData = await responseClone.json();
       } catch (e) {
         errorData = await response.text();
       }
+      
       console.error("DeepSeek API error response:", errorData);
       
       // Check if it's an API key issue
@@ -97,6 +101,8 @@ export async function processWithDeepSeek(
       throw new Error(`DeepSeek API error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
+    // This was causing the error - we were consuming the response body twice
+    // Now we get a fresh copy of the response JSON each time we need it
     const data = await response.json();
     
     // Log the response for debugging
