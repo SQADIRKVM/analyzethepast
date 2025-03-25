@@ -1,3 +1,4 @@
+
 import { extractQuestionsFromText, extractTextFromPDF, ExtractedText } from './pdfService';
 import { performOCR, extractTextFromPDFViaOCR } from './ocrService';
 import { databaseService } from './databaseService';
@@ -260,74 +261,6 @@ export const apiService = {
     } catch (error) {
       console.error("Error processing PDF with OCR:", error);
       throw new Error(`Failed to process PDF with OCR: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  },
-  
-  /**
-   * Combine multiple results and re-analyze topics
-   */
-  combineResults: async (questions: Question[]): Promise<AnalysisResult> => {
-    try {
-      // Re-analyze topics across all questions
-      const topics = extractCommonTopics(questions);
-      
-      // Save combined results to database
-      const result: AnalysisResult = {
-        questions,
-        topics
-      };
-      
-      await databaseService.saveQuestions(result);
-      
-      return result;
-    } catch (error) {
-      console.error("Error combining results:", error);
-      throw new Error(`Failed to combine results: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  },
-  
-  /**
-   * Process multiple files in batch
-   * This is a placeholder for future server-side batch processing
-   */
-  processBatch: async (
-    files: File[],
-    type: 'pdf' | 'image' | 'pdfocr',
-    onProgress: (progress: number, step: string) => void
-  ): Promise<AnalysisResult> => {
-    try {
-      // Call the proxy server's batch endpoint for server-side processing
-      // For now, we'll use the client-side processing for each file
-      onProgress(10, `Preparing to process ${files.length} files in batch`);
-      
-      // This would be replaced with a single server call in production
-      const formData = new FormData();
-      files.forEach((file, index) => {
-        formData.append(`file-${index}`, file);
-      });
-      
-      formData.append('fileCount', String(files.length));
-      formData.append('type', type);
-      
-      // Call the batch endpoint (currently just returns a placeholder response)
-      const response = await fetch('/api/batch', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-      }
-      
-      // In a real implementation, the server would process all files and return results
-      // For now, we'll just return an empty result
-      return {
-        questions: [],
-        topics: []
-      };
-    } catch (error) {
-      console.error("Error processing batch:", error);
-      throw new Error(`Failed to process batch: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
   

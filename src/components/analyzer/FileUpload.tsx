@@ -1,3 +1,4 @@
+
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileImage, FileText, Wand2 } from 'lucide-react';
@@ -33,8 +34,6 @@ const FileUpload = ({
       
       onUploadPdf(validFiles);
     } else {
-      // Log file count to help with debugging
-      console.log(`Uploading ${acceptedFiles.length} PDF files:`, acceptedFiles.map(f => f.name));
       onUploadPdf(acceptedFiles);
     }
   }, [onUploadPdf]);
@@ -85,7 +84,6 @@ const FileUpload = ({
     maxFiles: maxFiles,
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
-    multiple: true,
   });
 
   const { 
@@ -102,7 +100,6 @@ const FileUpload = ({
     maxFiles: maxFiles,
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
-    multiple: true,
   });
 
   const { 
@@ -118,7 +115,6 @@ const FileUpload = ({
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
     disabled: !onUploadPdfOcr,
-    multiple: true,
   });
 
   return (
@@ -249,4 +245,3 @@ const FileUpload = ({
 };
 
 export default FileUpload;
-
