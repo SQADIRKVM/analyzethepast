@@ -15,8 +15,7 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-app.use(express.json({ limit: '50mb' }));  // Increased limit for larger uploads
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json());
 
 // Root endpoint for health check
 app.get('/', (req, res) => {
@@ -124,16 +123,6 @@ app.post('/api/deepseek', async (req, res) => {
       stack: error.stack
     });
   }
-});
-
-// Add a batch processing endpoint for multiple files
-app.post('/api/batch', (req, res) => {
-  // This endpoint would be used for batch processing multiple files
-  // In a real implementation, this would handle multiple files sequentially or in parallel
-  res.json({ 
-    message: 'Batch processing endpoint ready',
-    received_files: req.body.fileCount || 0
-  });
 });
 
 // Error handling middleware

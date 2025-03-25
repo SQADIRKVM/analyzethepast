@@ -10,66 +10,48 @@ interface FileUploadProps {
   onUploadPdf: (files: File[]) => void;
   onUploadImage: (files: File[]) => void;
   onUploadPdfOcr?: (files: File[]) => void;
-  maxFiles?: number;
 }
 
-const FileUpload = ({ 
-  onUploadPdf, 
-  onUploadImage, 
-  onUploadPdfOcr, 
-  maxFiles = 10 
-}: FileUploadProps) => {
+const FileUpload = ({ onUploadPdf, onUploadImage, onUploadPdfOcr }: FileUploadProps) => {
   const [isOver, setIsOver] = useState(false);
   
   const onDropPdf = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
     
-    // Check file sizes (10MB limit per file)
-    const oversizedFiles = acceptedFiles.filter(file => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error(`${oversizedFiles.length} file(s) are too large. Maximum size per file is 10MB.`);
-      // Filter out oversized files
-      const validFiles = acceptedFiles.filter(file => file.size <= 10 * 1024 * 1024);
-      if (validFiles.length === 0) return;
-      
-      onUploadPdf(validFiles);
-    } else {
-      onUploadPdf(acceptedFiles);
+    // Check file size (10MB limit)
+    const file = acceptedFiles[0];
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 10MB.");
+      return;
     }
+    
+    onUploadPdf(acceptedFiles);
   }, [onUploadPdf]);
 
   const onDropImage = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
     
-    // Check file sizes (10MB limit per file)
-    const oversizedFiles = acceptedFiles.filter(file => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error(`${oversizedFiles.length} file(s) are too large. Maximum size per file is 10MB.`);
-      // Filter out oversized files
-      const validFiles = acceptedFiles.filter(file => file.size <= 10 * 1024 * 1024);
-      if (validFiles.length === 0) return;
-      
-      onUploadImage(validFiles);
-    } else {
-      onUploadImage(acceptedFiles);
+    // Check file size (10MB limit)
+    const file = acceptedFiles[0];
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 10MB.");
+      return;
     }
+    
+    onUploadImage(acceptedFiles);
   }, [onUploadImage]);
 
   const onDropPdfOcr = useCallback((acceptedFiles: File[]) => {
     if (!onUploadPdfOcr || acceptedFiles.length === 0) return;
     
-    // Check file sizes (10MB limit per file)
-    const oversizedFiles = acceptedFiles.filter(file => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      toast.error(`${oversizedFiles.length} file(s) are too large. Maximum size per file is 10MB.`);
-      // Filter out oversized files
-      const validFiles = acceptedFiles.filter(file => file.size <= 10 * 1024 * 1024);
-      if (validFiles.length === 0) return;
-      
-      onUploadPdfOcr(validFiles);
-    } else {
-      onUploadPdfOcr(acceptedFiles);
+    // Check file size (10MB limit)
+    const file = acceptedFiles[0];
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 10MB.");
+      return;
     }
+    
+    onUploadPdfOcr(acceptedFiles);
   }, [onUploadPdfOcr]);
 
   const { 
@@ -81,7 +63,7 @@ const FileUpload = ({
     accept: {
       'application/pdf': ['.pdf'],
     },
-    maxFiles: maxFiles,
+    maxFiles: 1,
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
   });
@@ -97,7 +79,7 @@ const FileUpload = ({
       'image/png': ['.png'],
       'image/tiff': ['.tiff', '.tif'],
     },
-    maxFiles: maxFiles,
+    maxFiles: 1,
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
   });
@@ -111,7 +93,7 @@ const FileUpload = ({
     accept: {
       'application/pdf': ['.pdf'],
     },
-    maxFiles: maxFiles,
+    maxFiles: 1,
     onDragEnter: () => setIsOver(true),
     onDragLeave: () => setIsOver(false),
     disabled: !onUploadPdfOcr,
@@ -142,20 +124,20 @@ const FileUpload = ({
               </div>
               <div>
                 <p className="text-lg font-medium">
-                  {isPdfDragActive ? 'Drop the PDF files here' : 'Drag & drop your PDF files here'}
+                  {isPdfDragActive ? 'Drop the PDF here' : 'Drag & drop your PDF file here'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  or click to browse files (PDF only, up to {maxFiles} files)
+                  or click to browse files (PDF only)
                 </p>
               </div>
               <Button type="button" className="mt-4">
-                Select PDF Files
+                Select PDF File
               </Button>
             </div>
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
             <p>Supported format: PDF (scanned question papers)</p>
-            <p>Maximum file size: 10MB per file</p>
+            <p>Maximum file size: 10MB</p>
             <p className="font-medium mt-1">Note: This method extracts text directly from the PDF</p>
           </div>
         </TabsContent>
@@ -179,27 +161,27 @@ const FileUpload = ({
               <div>
                 <p className="text-lg font-medium">
                   {isPdfOcrDragActive 
-                    ? 'Drop the PDF files here' 
+                    ? 'Drop the PDF here' 
                     : onUploadPdfOcr 
-                    ? 'Drag & drop your PDF files here' 
+                    ? 'Drag & drop your PDF file here' 
                     : 'Feature not available in demo'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {onUploadPdfOcr 
-                    ? `Convert PDF to images for better OCR results (up to ${maxFiles} files)` 
+                    ? 'Convert PDF to images for better OCR results' 
                     : 'This feature requires a backend Python service'}
                 </p>
               </div>
               {onUploadPdfOcr && (
                 <Button type="button" className="mt-4">
-                  Select PDF Files for OCR
+                  Select PDF for OCR
                 </Button>
               )}
             </div>
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
             <p>Supported format: PDF (scanned question papers)</p>
-            <p>Maximum file size: 10MB per file</p>
+            <p>Maximum file size: 10MB</p>
             <p className="font-medium mt-1">
               Note: This method converts PDF to images before OCR for better results with scanned documents
             </p>
@@ -222,20 +204,20 @@ const FileUpload = ({
               </div>
               <div>
                 <p className="text-lg font-medium">
-                  {isImageDragActive ? 'Drop the image files here' : 'Drag & drop your image files here'}
+                  {isImageDragActive ? 'Drop the image here' : 'Drag & drop your image file here'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  or click to browse files (JPG, PNG, TIFF, up to {maxFiles} files)
+                  or click to browse files (JPG, PNG, TIFF)
                 </p>
               </div>
               <Button type="button" className="mt-4">
-                Select Image Files
+                Select Image File
               </Button>
             </div>
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
             <p>Supported formats: JPG, PNG, TIFF (scanned question papers)</p>
-            <p>Maximum file size: 10MB per file</p>
+            <p>Maximum file size: 10MB</p>
             <p className="font-medium mt-1">Note: OCR works best with clear, high-contrast images</p>
           </div>
         </TabsContent>
