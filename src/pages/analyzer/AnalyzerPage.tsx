@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,12 +64,10 @@ const AnalyzerPage = () => {
   const handlePdfUpload = async (files: File[]) => {
     if (files.length === 0) return;
     
-    const pdfFile = files[0];
-    
     try {
       setStatus("uploading");
       setProgress(0);
-      setCurrentStep("");
+      setCurrentStep(`Preparing to process ${files.length} PDF file(s)`);
       
       const uploadInterval = setInterval(() => {
         setProgress((prev) => {
@@ -86,26 +83,24 @@ const AnalyzerPage = () => {
         clearInterval(uploadInterval);
         setStatus("processing");
         setProgress(0);
-        processPdfFile(pdfFile);
+        processPdfFiles(files);
       }, 1000);
       
     } catch (error) {
-      console.error("Error uploading file:", error);
+      console.error("Error uploading files:", error);
       setStatus("error");
-      setErrorMessage("Failed to upload the file. Please try again.");
-      toast.error("Failed to upload the file");
+      setErrorMessage("Failed to upload the files. Please try again.");
+      toast.error("Failed to upload the files");
     }
   };
 
   const handlePdfOcrUpload = async (files: File[]) => {
     if (files.length === 0) return;
     
-    const pdfFile = files[0];
-    
     try {
       setStatus("uploading");
       setProgress(0);
-      setCurrentStep("");
+      setCurrentStep(`Preparing to process ${files.length} PDF file(s) with OCR`);
       
       const uploadInterval = setInterval(() => {
         setProgress((prev) => {
@@ -121,26 +116,24 @@ const AnalyzerPage = () => {
         clearInterval(uploadInterval);
         setStatus("processing");
         setProgress(0);
-        processPdfWithOcr(pdfFile);
+        processPdfFilesWithOcr(files);
       }, 1000);
       
     } catch (error) {
-      console.error("Error uploading file for OCR:", error);
+      console.error("Error uploading files for OCR:", error);
       setStatus("error");
-      setErrorMessage("Failed to upload the file. Please try again.");
-      toast.error("Failed to upload the file");
+      setErrorMessage("Failed to upload the files. Please try again.");
+      toast.error("Failed to upload the files");
     }
   };
 
   const handleImageUpload = async (files: File[]) => {
     if (files.length === 0) return;
     
-    const imageFile = files[0];
-    
     try {
       setStatus("uploading");
       setProgress(0);
-      setCurrentStep("");
+      setCurrentStep(`Preparing to process ${files.length} image file(s)`);
       
       const uploadInterval = setInterval(() => {
         setProgress((prev) => {
@@ -156,93 +149,144 @@ const AnalyzerPage = () => {
         clearInterval(uploadInterval);
         setStatus("processing");
         setProgress(0);
-        processImageFile(imageFile);
+        processImageFiles(files);
       }, 1000);
       
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.error("Error uploading images:", error);
       setStatus("error");
-      setErrorMessage("Failed to upload the image. Please try again.");
-      toast.error("Failed to upload the image");
+      setErrorMessage("Failed to upload the images. Please try again.");
+      toast.error("Failed to upload the images");
     }
   };
 
-  const processPdfFile = async (file: File) => {
+  const processPdfFiles = async (files: File[]) => {
     try {
-      const result = await apiService.processPdfFile(
-        file,
-        (progress, step) => {
-          setProgress(progress);
-          setCurrentStep(step);
-        }
-      );
+      let allQuestions: Question[] = [];
+      let allTopics: QuestionTopic[] = [];
+      let totalFiles = files.length;
       
-      setProgress(100);
-      setStatus("completed");
-      setQuestions(result.questions);
-      setTopics(result.topics);
-      
-      toast.success(`Successfully extracted ${result.questions.length} questions!`);
-      
-    } catch (error) {
-      console.error("Error processing file:", error);
-      setStatus("error");
-      setErrorMessage("Failed to process the file. Please try a different PDF.");
-      toast.error("Failed to process the file");
-    }
-  };
-
-  const processPdfWithOcr = async (file: File) => {
-    try {
-      const result = await apiService.processPdfWithOCR(
-        file,
-        (progress, step) => {
-          setProgress(progress);
-          setCurrentStep(step);
-        }
-      );
-      
-      setProgress(100);
-      setStatus("completed");
-      setQuestions(result.questions);
-      setTopics(result.topics);
-      
-      toast.success(`Successfully extracted ${result.questions.length} questions!`);
-      
-    } catch (error) {
-      console.error("Error processing file with OCR:", error);
-      setStatus("error");
-      setErrorMessage("Failed to process the file with OCR. Please try a different approach.");
-      toast.error("Failed to process the file with OCR");
-    }
-  };
-
-  const processImageFile = async (file: File) => {
-    try {
-      const result = await apiService.processImageFile(
-        file,
-        (progress, step) => {
-          setProgress(progress);
-          setCurrentStep(step);
-        }
-      );
-      
-      setProgress(100);
-      setStatus("completed");
-      setQuestions(result.questions);
-      setTopics(result.topics);
-      
-      const message = result.questions.length > 0
-        ? `Successfully extracted ${result.questions.length} questions!`
-        : "Processing complete, but no questions were found.";
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setCurrentStep(`Processing PDF ${i+1} of ${totalFiles}: ${file.name}`);
         
-      toast.success(message);
+        const fileStartProgress = (i / totalFiles) * 100;
+        const fileEndProgress = ((i + 1) / totalFiles) * 100;
+        
+        const result = await apiService.processPdfFile(
+          file,
+          (fileProgress, step) => {
+            const scaledProgress = fileStartProgress + (fileProgress * (fileEndProgress - fileStartProgress) / 100);
+            setProgress(Math.floor(scaledProgress));
+            setCurrentStep(`PDF ${i+1} of ${totalFiles} (${file.name}): ${step}`);
+          }
+        );
+        
+        allQuestions = [...allQuestions, ...result.questions];
+        
+        toast.success(`Processed ${i+1} of ${totalFiles} files`);
+      }
+      
+      const combinedResult = await apiService.combineResults(allQuestions);
+      
+      setProgress(100);
+      setStatus("completed");
+      setQuestions(combinedResult.questions);
+      setTopics(combinedResult.topics);
+      
+      toast.success(`Successfully extracted ${combinedResult.questions.length} questions from ${totalFiles} files!`);
       
     } catch (error) {
-      console.error("Error processing image:", error);
+      console.error("Error processing files:", error);
       setStatus("error");
-      setErrorMessage("Failed to process the image. Please try a different image with clearer text.");
-      toast.error("Failed to process the image");
+      setErrorMessage("Failed to process one or more files. Please try again.");
+      toast.error("Failed to process the files");
+    }
+  };
+
+  const processPdfFilesWithOcr = async (files: File[]) => {
+    try {
+      let allQuestions: Question[] = [];
+      let totalFiles = files.length;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setCurrentStep(`Processing PDF with OCR ${i+1} of ${totalFiles}: ${file.name}`);
+        
+        const fileStartProgress = (i / totalFiles) * 100;
+        const fileEndProgress = ((i + 1) / totalFiles) * 100;
+        
+        const result = await apiService.processPdfWithOCR(
+          file,
+          (fileProgress, step) => {
+            const scaledProgress = fileStartProgress + (fileProgress * (fileEndProgress - fileStartProgress) / 100);
+            setProgress(Math.floor(scaledProgress));
+            setCurrentStep(`PDF with OCR ${i+1} of ${totalFiles} (${file.name}): ${step}`);
+          }
+        );
+        
+        allQuestions = [...allQuestions, ...result.questions];
+        
+        toast.success(`Processed ${i+1} of ${totalFiles} files with OCR`);
+      }
+      
+      const combinedResult = await apiService.combineResults(allQuestions);
+      
+      setProgress(100);
+      setStatus("completed");
+      setQuestions(combinedResult.questions);
+      setTopics(combinedResult.topics);
+      
+      toast.success(`Successfully extracted ${combinedResult.questions.length} questions from ${totalFiles} files with OCR!`);
+      
+    } catch (error) {
+      console.error("Error processing files with OCR:", error);
+      setStatus("error");
+      setErrorMessage("Failed to process one or more files with OCR. Please try again.");
+      toast.error("Failed to process the files with OCR");
+    }
+  };
+
+  const processImageFiles = async (files: File[]) => {
+    try {
+      let allQuestions: Question[] = [];
+      let totalFiles = files.length;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setCurrentStep(`Processing image ${i+1} of ${totalFiles}: ${file.name}`);
+        
+        const fileStartProgress = (i / totalFiles) * 100;
+        const fileEndProgress = ((i + 1) / totalFiles) * 100;
+        
+        const result = await apiService.processImageFile(
+          file,
+          (fileProgress, step) => {
+            const scaledProgress = fileStartProgress + (fileProgress * (fileEndProgress - fileStartProgress) / 100);
+            setProgress(Math.floor(scaledProgress));
+            setCurrentStep(`Image ${i+1} of ${totalFiles} (${file.name}): ${step}`);
+          }
+        );
+        
+        allQuestions = [...allQuestions, ...result.questions];
+        
+        toast.success(`Processed ${i+1} of ${totalFiles} image files`);
+      }
+      
+      const combinedResult = await apiService.combineResults(allQuestions);
+      
+      setProgress(100);
+      setStatus("completed");
+      setQuestions(combinedResult.questions);
+      setTopics(combinedResult.topics);
+      
+      toast.success(`Successfully extracted ${combinedResult.questions.length} questions from ${totalFiles} image files!`);
+      
+    } catch (error) {
+      console.error("Error processing images:", error);
+      setStatus("error");
+      setErrorMessage("Failed to process one or more images. Please try again.");
+      toast.error("Failed to process the images");
     }
   };
 

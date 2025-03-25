@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -126,14 +125,33 @@ app.post('/api/deepseek', async (req, res) => {
   }
 });
 
-// Add a batch processing endpoint for multiple files
-app.post('/api/batch', (req, res) => {
-  // This endpoint would be used for batch processing multiple files
-  // In a real implementation, this would handle multiple files sequentially or in parallel
-  res.json({ 
-    message: 'Batch processing endpoint ready',
-    received_files: req.body.fileCount || 0
-  });
+// Enhance batch processing endpoint for multiple files
+app.post('/api/batch', async (req, res) => {
+  try {
+    console.log('Received batch processing request');
+    console.log('Files received:', req.files ? Object.keys(req.files).length : 0);
+    console.log('Form data:', req.body);
+
+    // In a production implementation, this would:
+    // 1. Process each file in parallel or sequentially
+    // 2. Combine the results
+    // 3. Return the aggregated data
+    
+    // For now, just return acknowledgment
+    res.json({ 
+      message: 'Batch processing request received',
+      received_files: req.body.fileCount || 0,
+      type: req.body.type || 'unknown',
+      status: 'pending'
+    });
+  } catch (error) {
+    console.error('Batch processing error:', error);
+    res.status(500).json({
+      error: 'Failed to process batch request',
+      details: error.message,
+      stack: error.stack
+    });
+  }
 });
 
 // Error handling middleware
@@ -149,4 +167,4 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Proxy server running on port ${port}`);
   console.log(`Test the server at: http://localhost:${port}/test`);
-}); 
+});
