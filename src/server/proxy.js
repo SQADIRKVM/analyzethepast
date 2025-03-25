@@ -14,6 +14,7 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
+// Increase JSON and URL-encoded body size limits for larger file uploads
 app.use(express.json({ limit: '50mb' }));  // Increased limit for larger uploads
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -125,7 +126,7 @@ app.post('/api/deepseek', async (req, res) => {
   }
 });
 
-// Enhance batch processing endpoint for multiple files
+// Enhanced batch processing endpoint for multiple files
 app.post('/api/batch', async (req, res) => {
   try {
     console.log('Received batch processing request');
@@ -167,4 +168,5 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Proxy server running on port ${port}`);
   console.log(`Test the server at: http://localhost:${port}/test`);
+  console.log(`File size limit: ${app.get('json limit') || '50mb'}`);
 });

@@ -68,6 +68,7 @@ const AnalyzerPage = () => {
       setStatus("uploading");
       setProgress(0);
       setCurrentStep(`Preparing to process ${files.length} PDF file(s)`);
+      console.log(`Starting to process ${files.length} PDF files`);
       
       const uploadInterval = setInterval(() => {
         setProgress((prev) => {
@@ -162,13 +163,14 @@ const AnalyzerPage = () => {
 
   const processPdfFiles = async (files: File[]) => {
     try {
+      console.log(`Processing ${files.length} PDF files`);
       let allQuestions: Question[] = [];
-      let allTopics: QuestionTopic[] = [];
       let totalFiles = files.length;
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setCurrentStep(`Processing PDF ${i+1} of ${totalFiles}: ${file.name}`);
+        console.log(`Processing PDF ${i+1}/${totalFiles}: ${file.name}`);
         
         const fileStartProgress = (i / totalFiles) * 100;
         const fileEndProgress = ((i + 1) / totalFiles) * 100;
@@ -182,11 +184,13 @@ const AnalyzerPage = () => {
           }
         );
         
+        console.log(`Extracted ${result.questions.length} questions from file ${i+1}`);
         allQuestions = [...allQuestions, ...result.questions];
         
         toast.success(`Processed ${i+1} of ${totalFiles} files`);
       }
       
+      console.log(`Total questions extracted: ${allQuestions.length}`);
       const combinedResult = await apiService.combineResults(allQuestions);
       
       setProgress(100);
@@ -391,3 +395,4 @@ const AnalyzerPage = () => {
 };
 
 export default AnalyzerPage;
+
