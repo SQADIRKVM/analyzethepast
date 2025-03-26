@@ -15,6 +15,15 @@ interface VideoSearchResult {
 }
 
 /**
+ * Get proxy server URL based on environment
+ * @returns The appropriate proxy server URL
+ */
+function getProxyServerUrl(): string {
+  // In development, use localhost:3000
+  return "http://localhost:3000";
+}
+
+/**
  * Process text using the DeepSeek API via our proxy server
  * @param text The text to process
  * @param prompt The system prompt for DeepSeek
@@ -64,7 +73,10 @@ export async function processWithDeepSeek(
     console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
     // Make request to our proxy server instead of DeepSeek API directly
-    const response = await fetch("http://localhost:3001/api/deepseek", {
+    const proxyUrl = `${getProxyServerUrl()}/api/deepseek`;
+    console.log("Using proxy URL:", proxyUrl);
+    
+    const response = await fetch(proxyUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -87,6 +99,8 @@ export async function processWithDeepSeek(
       // Check if it's an API key issue
       if (response.status === 401 || response.status === 403) {
         toast.error("Invalid DeepSeek API key. Please check your settings.");
+      } else if (response.status === 404) {
+        toast.error("Proxy server not found. Make sure the server is running on port 3000.");
       } else {
         toast.error(`API error: ${response.status}. Please try again or check console for details.`);
       }
