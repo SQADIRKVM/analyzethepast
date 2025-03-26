@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -169,13 +168,18 @@ const AnalyzerPage = () => {
 
   const processPdfFile = async (file: File) => {
     try {
+      console.log("Starting PDF processing...");
+      
       const result = await apiService.processPdfFile(
         file,
         (progress, step) => {
+          console.log(`Processing progress: ${progress}%, Step: ${step}`);
           setProgress(progress);
           setCurrentStep(step);
         }
       );
+      
+      console.log("PDF processing complete:", result);
       
       setProgress(100);
       setStatus("completed");
@@ -187,20 +191,25 @@ const AnalyzerPage = () => {
     } catch (error) {
       console.error("Error processing file:", error);
       setStatus("error");
-      setErrorMessage("Failed to process the file. Please try a different PDF.");
+      setErrorMessage(`Failed to process the file: ${error instanceof Error ? error.message : String(error)}`);
       toast.error("Failed to process the file");
     }
   };
 
   const processPdfWithOcr = async (file: File) => {
     try {
+      console.log("Starting PDF OCR processing...");
+      
       const result = await apiService.processPdfWithOCR(
         file,
         (progress, step) => {
+          console.log(`OCR processing progress: ${progress}%, Step: ${step}`);
           setProgress(progress);
           setCurrentStep(step);
         }
       );
+      
+      console.log("PDF OCR processing complete:", result);
       
       setProgress(100);
       setStatus("completed");
@@ -212,20 +221,25 @@ const AnalyzerPage = () => {
     } catch (error) {
       console.error("Error processing file with OCR:", error);
       setStatus("error");
-      setErrorMessage("Failed to process the file with OCR. Please try a different approach.");
+      setErrorMessage(`Failed to process the file with OCR: ${error instanceof Error ? error.message : String(error)}`);
       toast.error("Failed to process the file with OCR");
     }
   };
 
   const processImageFile = async (file: File) => {
     try {
+      console.log("Starting image processing...");
+      
       const result = await apiService.processImageFile(
         file,
         (progress, step) => {
+          console.log(`Image processing progress: ${progress}%, Step: ${step}`);
           setProgress(progress);
           setCurrentStep(step);
         }
       );
+      
+      console.log("Image processing complete:", result);
       
       setProgress(100);
       setStatus("completed");
@@ -241,7 +255,7 @@ const AnalyzerPage = () => {
     } catch (error) {
       console.error("Error processing image:", error);
       setStatus("error");
-      setErrorMessage("Failed to process the image. Please try a different image with clearer text.");
+      setErrorMessage(`Failed to process the image: ${error instanceof Error ? error.message : String(error)}`);
       toast.error("Failed to process the image");
     }
   };

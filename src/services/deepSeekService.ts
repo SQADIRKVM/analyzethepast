@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 interface DeepSeekOptions {
@@ -63,8 +62,9 @@ export async function processWithDeepSeek(
 
     console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
-    // Use the proxy server URL with the correct port (3000)
+    // Get the proxy URL but make sure to use the correct port
     const proxyUrl = getProxyServerUrl();
+    console.log("Using proxy URL:", proxyUrl);
     
     // Make request to our proxy server instead of DeepSeek API directly
     const response = await fetch(`${proxyUrl}/api/deepseek`, {
@@ -136,11 +136,14 @@ export async function processWithDeepSeek(
 function getProxyServerUrl(): string {
   // Check if we're in development or production
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Local development
+    // Local development - make sure to use port 3000 (where the proxy server runs)
     return 'http://localhost:3000';
   } else {
-    // Production - Use relative URL to avoid CORS in production
-    return '';
+    // Production environment - ensure we're using relative URL to avoid CORS
+    // Return empty string to use relative URLs for the same domain
+    const baseUrl = window.location.origin;
+    console.log(`Using base URL for proxy: ${baseUrl}`);
+    return baseUrl;
   }
 }
 
