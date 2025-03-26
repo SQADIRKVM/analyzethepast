@@ -6,9 +6,9 @@ const fetch = require('node-fetch');
 const app = express();
 const port = 3000;
 
-// Enable CORS for all origins in development
+// Enable CORS for all origins
 app.use(cors({
-  origin: '*', // Allow all origins in development
+  origin: '*', // Allow all origins
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   preflightContinue: false,
