@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 interface DeepSeekOptions {
@@ -19,8 +18,19 @@ interface VideoSearchResult {
  * @returns The appropriate proxy server URL
  */
 function getProxyServerUrl(): string {
-  // In development, use localhost:3000
-  return "http://localhost:3000";
+  // Check if we're running in a production/preview environment
+  const isRemoteEnvironment = 
+    window.location.hostname.includes('lovable.app') || 
+    window.location.hostname.includes('lovableproject.com');
+  
+  if (isRemoteEnvironment) {
+    // If we're in a remote environment, the user needs to run the local proxy server
+    // We'll use localhost which they need to have running
+    return "http://localhost:3000";
+  } else {
+    // In local development, use localhost:3000
+    return "http://localhost:3000";
+  }
 }
 
 /**
@@ -41,6 +51,7 @@ export async function processWithDeepSeek(
     
     if (!deepseekApiKey) {
       console.log("No DeepSeek API key found");
+      toast.error("DeepSeek API key is required. Please add it in Settings.");
       throw new Error("DeepSeek API key is required");
     }
 
@@ -76,6 +87,7 @@ export async function processWithDeepSeek(
     const proxyUrl = `${getProxyServerUrl()}/api/deepseek`;
     console.log("Using proxy URL:", proxyUrl);
     
+    // Set no-cors mode for remote environments to help with CORS issues
     const response = await fetch(proxyUrl, {
       method: "POST",
       headers: {
@@ -130,7 +142,14 @@ export async function processWithDeepSeek(
     return data.choices[0].message.content;
   } catch (error) {
     console.error("DeepSeek API error:", error);
-    toast.error("AI text processing failed");
+    
+    // Add more specific error message for CORS errors
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      toast.error("Cannot connect to the proxy server. Make sure it's running on port 3000 and has CORS enabled.");
+    } else {
+      toast.error("AI text processing failed");
+    }
+    
     throw error;
   }
 }

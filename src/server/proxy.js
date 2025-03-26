@@ -6,10 +6,11 @@ const fetch = require('node-fetch');
 const app = express();
 const port = 3000;
 
-// Enable CORS for all origins
+// Enable CORS for all origins with proper configuration
 app.use(cors({
   origin: '*', // Allow all origins
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-DeepSeek-API-Key', 'Authorization'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
