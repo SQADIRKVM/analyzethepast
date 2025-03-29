@@ -22,12 +22,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Root endpoint for health check
 app.get('/', (req, res) => {
-  res.json({ status: 'Proxy server root endpoint' });
+  res.json({ 
+    status: 'Proxy server is running',
+    message: 'This proxy server enables communication with the DeepSeek API. Use the /api/deepseek endpoint to access the DeepSeek API.',
+    usage: 'Make sure this server is running when using the Question Paper Analyzer in the Lovable preview environment.'
+  });
 });
 
-// Test endpoint
+// Test endpoint for checking server availability
 app.get('/test', (req, res) => {
-  res.json({ status: 'Proxy server is running!' });
+  res.json({ status: 'ok', message: 'Proxy server is running!' });
 });
 
 // Add documentation endpoint for the DeepSeek API
@@ -144,4 +148,5 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Proxy server running on port ${port}`);
   console.log(`Test the server at: http://localhost:${port}/test`);
+  console.log(`DeepSeek API proxy available at: http://localhost:${port}/api/deepseek`);
 }); 

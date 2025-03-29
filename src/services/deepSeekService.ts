@@ -1,4 +1,7 @@
+
 import { toast } from 'sonner';
+import { extractQuestionsFromText } from './pdfService';
+import { Question } from '@/pages/analyzer/types';
 
 interface DeepSeekOptions {
   model?: string;
@@ -34,6 +37,26 @@ function getProxyServerUrl(): string {
 }
 
 /**
+ * Check if the proxy server is running and accessible
+ * @returns Promise that resolves to true if the proxy is available
+ */
+async function isProxyServerAvailable(): Promise<boolean> {
+  try {
+    const proxyUrl = `${getProxyServerUrl()}/test`;
+    const response = await fetch(proxyUrl, { 
+      method: 'GET',
+      // Use a short timeout to avoid long waits
+      signal: AbortSignal.timeout(2000)
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.log("Proxy server unavailable:", error);
+    return false;
+  }
+}
+
+/**
  * Process text using the DeepSeek API via our proxy server
  * @param text The text to process
  * @param prompt The system prompt for DeepSeek
@@ -46,6 +69,18 @@ export async function processWithDeepSeek(
   options: DeepSeekOptions = {}
 ): Promise<string> {
   try {
+    // First check if the proxy server is available
+    const isProxyAvailable = await isProxyServerAvailable();
+    
+    if (!isProxyAvailable) {
+      console.log("Proxy server is not running or accessible");
+      toast.error(
+        "Cannot connect to the proxy server. Please make sure the proxy server is running on port 3000.",
+        { duration: 6000 }
+      );
+      throw new Error("Proxy server not available. Run 'node src/server/proxy.js' to start it.");
+    }
+    
     // Get the API key from localStorage
     const deepseekApiKey = localStorage.getItem('deepseekApiKey');
     
@@ -87,65 +122,78 @@ export async function processWithDeepSeek(
     const proxyUrl = `${getProxyServerUrl()}/api/deepseek`;
     console.log("Using proxy URL:", proxyUrl);
     
-    // Set no-cors mode for remote environments to help with CORS issues
-    const response = await fetch(proxyUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-DeepSeek-API-Key": deepseekApiKey
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    console.log("Proxy server response status:", response.status);
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        errorData = await response.text();
-      }
-      console.error("DeepSeek API error response:", errorData);
-      
-      // Check if it's an API key issue
-      if (response.status === 401 || response.status === 403) {
-        toast.error("Invalid DeepSeek API key. Please check your settings.");
-      } else if (response.status === 404) {
-        toast.error("Proxy server not found. Make sure the server is running on port 3000.");
-      } else {
-        toast.error(`API error: ${response.status}. Please try again or check console for details.`);
-      }
-      
-      throw new Error(`DeepSeek API error: ${response.status} - ${JSON.stringify(errorData)}`);
-    }
-
-    const data = await response.json();
+    // Set timeout to avoid long waits if server is down
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
     
-    // Log the response for debugging
-    console.log("DeepSeek API response data:", JSON.stringify(data, null, 2));
-
-    // Validate response structure
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-      console.error("Invalid API response structure:", data);
+    try {
+      const response = await fetch(proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-DeepSeek-API-Key": deepseekApiKey
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
       
-      // If we got an error message from the API, show it
-      if (data.error || data.error_msg) {
-        toast.error(`DeepSeek API error: ${data.error || data.error_msg}`);
-      } else {
-        toast.error("Unexpected API response format");
+      clearTimeout(timeoutId);
+      
+      console.log("Proxy server response status:", response.status);
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = await response.text();
+        }
+        console.error("DeepSeek API error response:", errorData);
+        
+        // Check if it's an API key issue
+        if (response.status === 401 || response.status === 403) {
+          toast.error("Invalid DeepSeek API key. Please check your settings.");
+        } else if (response.status === 404) {
+          toast.error("Proxy server not found. Make sure the server is running on port 3000.");
+        } else {
+          toast.error(`API error: ${response.status}. Please try again or check console for details.`);
+        }
+        
+        throw new Error(`DeepSeek API error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
-      
-      throw new Error("Invalid API response structure");
-    }
 
-    return data.choices[0].message.content;
+      const data = await response.json();
+      
+      // Log the response for debugging
+      console.log("DeepSeek API response data:", JSON.stringify(data, null, 2));
+
+      // Validate response structure
+      if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+        console.error("Invalid API response structure:", data);
+        
+        // If we got an error message from the API, show it
+        if (data.error || data.error_msg) {
+          toast.error(`DeepSeek API error: ${data.error || data.error_msg}`);
+        } else {
+          toast.error("Unexpected API response format");
+        }
+        
+        throw new Error("Invalid API response structure");
+      }
+
+      return data.choices[0].message.content;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
+    }
   } catch (error) {
     console.error("DeepSeek API error:", error);
     
     // Add more specific error message for CORS errors
     if (error instanceof TypeError && error.message.includes('fetch')) {
       toast.error("Cannot connect to the proxy server. Make sure it's running on port 3000 and has CORS enabled.");
+    } else if (error instanceof DOMException && error.name === 'AbortError') {
+      toast.error("Request timed out. The proxy server may be running but is not responding.");
     } else {
       toast.error("AI text processing failed");
     }
@@ -155,7 +203,7 @@ export async function processWithDeepSeek(
 }
 
 /**
- * Enhance and correct text using DeepSeek
+ * Enhance and correct text using DeepSeek (with fallback)
  * @param text The text to enhance
  * @returns Enhanced text with grammar corrections and formatting
  */
@@ -187,14 +235,36 @@ export async function enhanceText(text: string): Promise<string> {
     return enhancedText;
   } catch (error) {
     console.error("Text enhancement error:", error);
-    toast.error("Text enhancement failed");
-    // Return original text if enhancement fails
-    return text;
+    toast.warn("Text enhancement failed, using original text with basic formatting");
+    
+    // Apply basic formatting ourselves as a fallback
+    const formattedText = applyBasicTextFormatting(text);
+    return formattedText;
   }
 }
 
 /**
- * Identify and analyze questions in a text
+ * Fallback function to apply basic text formatting when AI enhancement fails
+ */
+function applyBasicTextFormatting(text: string): string {
+  // Replace multiple spaces with single space
+  let formatted = text.replace(/\s+/g, ' ');
+  
+  // Try to detect and fix paragraph breaks
+  formatted = formatted.replace(/\.\s+([A-Z])/g, '.\n\n$1');
+  
+  // Try to detect and fix question numbering
+  formatted = formatted.replace(/(\d+\.)\s+/g, '\n$1 ');
+  
+  // Add spacing for readability
+  formatted = formatted.replace(/PART\s+([A-Z])/g, '\n\nPART $1\n');
+  formatted = formatted.replace(/Module\s+(\d+|-\d+)/g, '\n\nModule $1\n');
+  
+  return formatted;
+}
+
+/**
+ * Identify and analyze questions in a text (with fallback)
  * @param text The text containing questions
  * @returns Structured analysis of identified questions
  */
@@ -289,14 +359,96 @@ export async function analyzeQuestions(text: string): Promise<any> {
       return analysis;
     } catch (jsonError) {
       console.error("JSON parsing error:", jsonError, "Raw text:", cleanedAnalysisText);
-      toast.error("Failed to parse question analysis");
+      toast.error("Failed to parse question analysis, using fallback method");
       throw jsonError;
     }
   } catch (error) {
     console.error("Question analysis error:", error);
-    toast.error("Question analysis failed");
-    throw error;
+    toast.warn("AI analysis failed, using basic extraction method");
+    
+    // Use the fallback method to extract questions
+    const basicQuestions = await extractQuestionsWithFallback(text);
+    return basicQuestions;
   }
+}
+
+/**
+ * Fallback function to extract questions when AI analysis fails
+ */
+async function extractQuestionsWithFallback(text: string): Promise<any[]> {
+  // Convert text to our expected format
+  const extractedTextForFallback = [{ 
+    text, 
+    pageNumber: 1 
+  }];
+  
+  // Use the built-in question extraction method
+  const extractedQuestions = await extractQuestionsFromText(extractedTextForFallback);
+  
+  // Extract year from text
+  const year = extractYearFromText(text) || new Date().getFullYear().toString();
+  
+  // Detect subject from text
+  const subject = detectSubjectFromText(text);
+  
+  // Convert to our standardized format
+  return extractedQuestions.map(question => ({
+    questionText: question.text,
+    subject: subject || question.subject || "Computer Science",
+    subSubject: question.subject || "System Software",
+    topics: question.keywords || [],
+    keywords: question.keywords || [],
+    year: year
+  }));
+}
+
+/**
+ * Attempt to detect the main subject from text content
+ */
+function detectSubjectFromText(text: string): string {
+  const lowerText = text.toLowerCase();
+  
+  // Common subject indicators
+  const subjectIndicators = {
+    "Computer Science": [
+      "compiler", "assembler", "system software", "programming", "algorithm", 
+      "data structure", "operating system", "database", "network"
+    ],
+    "Mathematics": [
+      "calculus", "algebra", "geometry", "trigonometry", "statistics", 
+      "probability", "theorem", "equation", "function", "matrix"
+    ],
+    "Physics": [
+      "mechanics", "dynamics", "electromagnetic", "quantum", "relativity",
+      "thermodynamics", "optics", "nuclear", "particle", "wave"
+    ]
+    // Add more subjects as needed
+  };
+  
+  // Check for course code patterns
+  if (lowerText.includes("cst") || lowerText.includes("cs")) {
+    return "Computer Science";
+  }
+  
+  // Check content for subject indicators
+  let bestMatch = "Computer Science"; // Default
+  let highestScore = 0;
+  
+  for (const [subject, indicators] of Object.entries(subjectIndicators)) {
+    let score = 0;
+    for (const indicator of indicators) {
+      if (lowerText.includes(indicator)) {
+        score++;
+      }
+    }
+    
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = subject;
+    }
+  }
+  
+  return bestMatch;
 }
 
 // Helper function to extract year from text
