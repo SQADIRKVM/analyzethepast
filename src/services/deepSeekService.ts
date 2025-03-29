@@ -235,7 +235,7 @@ export async function enhanceText(text: string): Promise<string> {
     return enhancedText;
   } catch (error) {
     console.error("Text enhancement error:", error);
-    toast.warn("Text enhancement failed, using original text with basic formatting");
+    toast.warning("Text enhancement failed, using original text with basic formatting");
     
     // Apply basic formatting ourselves as a fallback
     const formattedText = applyBasicTextFormatting(text);
@@ -364,7 +364,7 @@ export async function analyzeQuestions(text: string): Promise<any> {
     }
   } catch (error) {
     console.error("Question analysis error:", error);
-    toast.warn("AI analysis failed, using basic extraction method");
+    toast.warning("AI analysis failed, using basic extraction method");
     
     // Use the fallback method to extract questions
     const basicQuestions = await extractQuestionsWithFallback(text);
